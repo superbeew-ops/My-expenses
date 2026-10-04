@@ -17,6 +17,9 @@ header{display:flex;align-items:center;justify-content:space-between;margin:6px 
 .modal{display:none;position:fixed;inset:0;background:#0005;align-items:flex-end;justify-content:center;z-index:5}.sheet{background:#fff;border-radius:28px 28px 0 0;width:min(560px,100%);padding:19px 17px 28px;max-height:92vh;overflow:auto}.sheet h2{margin:0 0 15px}.field{margin:12px 0}.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:7px}.input,.select{width:100%;padding:13px;border:1px solid var(--line);border-radius:14px;font-size:16px;background:#fff}.paygrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pay{border:1px solid var(--line);background:#fff;padding:11px 4px;border-radius:14px;text-align:center;font-size:12px}.pay.sel{background:var(--lav);border-color:#b9aaff;color:#604bd0;font-weight:800}.actions{display:flex;gap:9px;margin-top:16px}.btn{flex:1;border:0;border-radius:15px;padding:14px;font-size:15px;font-weight:800}.cancel{background:#f2efed}.save{background:#292624;color:#fff}.danger{background:#fff0f2;color:#c84d68}
 .toast{position:fixed;left:50%;bottom:95px;transform:translateX(-50%);background:#292624;color:#fff;padding:11px 15px;border-radius:14px;font-size:13px;display:none;z-index:10;white-space:nowrap}
 .listBtn{width:100%;padding:12px;border:1px solid var(--line);background:#fff;border-radius:14px;text-align:left;margin-top:7px}
+
+.cardrow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.cardrow:last-child{border-bottom:0}.cardname{display:flex;align-items:center;gap:8px;font-weight:650}.cardamount{font-weight:800}
 </style>
 </head>
 <body>
@@ -25,13 +28,24 @@ header{display:flex;align-items:center;justify-content:space-between;margin:6px 
 
 <div class="total"><div class="label">ค่าใช้จ่ายเดือนนี้</div><div class="big" id="total">฿0.00</div><div class="monthNav"><button onclick="changeMonth(-1)">‹</button><div class="monthName" id="month"></div><button onclick="changeMonth(1)">›</button></div></div>
 
+
+<div class="card" style="margin-top:13px">
+  <div class="cardhead"><div class="ctitle">ช่วงวันที่</div><button class="link" onclick="resetRange()">ทั้งเดือน</button></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div><div class="small" style="margin-bottom:6px">ตั้งแต่</div><input class="input" id="fromDate" type="date" onchange="setRangeFromUI()"></div>
+    <div><div class="small" style="margin-bottom:6px">ถึง</div><input class="input" id="toDate" type="date" onchange="setRangeFromUI()"></div>
+  </div>
+  <div class="small" id="rangeLabel" style="margin-top:9px"></div>
+</div>
 <div class="paySummary"><div class="payCard"><div class="p">💵 เงินสด</div><b id="cash">฿0</b></div><div class="payCard"><div class="p">💳 บัตร</div><b id="cardTotal">฿0</b></div><div class="payCard"><div class="p">🏦 โอน</div><b id="bank">฿0</b></div></div>
 
+
+<div class="card"><div class="cardhead"><div class="ctitle">ใช้ผ่านบัตรเครดิต</div><div class="small" id="cardRangeTotal"></div></div><div id="cardBreakdown"></div></div>
 <div class="card"><div class="cardhead"><div class="ctitle">สรุปตามหมวด</div><div class="small" id="count"></div></div><div class="category" id="cats"></div></div>
 
 <div class="card"><div class="cardhead"><div class="ctitle">รายการ</div><button class="link" onclick="clearSearch()">ล้างค้นหา</button></div><input class="search" id="search" placeholder="🔎 ค้นหา เช่น ชาบู / เซรั่ม / KBank" oninput="renderItems()"><div id="items"></div></div>
 
-<div class="card"><div class="cardhead"><div class="ctitle">ข้อมูล</div></div><div class="small">ข้อมูลเก็บในเครื่องนี้เป็นหลัก แนะนำให้สำรองข้อมูลเป็นระยะ</div><button class="listBtn" onclick="backup()">↥ สำรองข้อมูลเป็นไฟล์</button><button class="listBtn" onclick="document.getElementById('restore').click()">↧ นำเข้าข้อมูลจากไฟล์</button><input id="restore" type="file" accept=".json" hidden onchange="restore(event)"></div>
+<div class="card"><div class="cardhead"><div class="ctitle">ข้อมูล</div></div><div class="small">เลือกช่วงวันที่ได้ เช่น 1–15 หรือ 16–สิ้นเดือน และดูยอดบัตรแต่ละใบแยกกันได้ ข้อมูลเก็บในเครื่องนี้เป็นหลัก แนะนำให้สำรองข้อมูลเป็นระยะ</div><button class="listBtn" onclick="backup()">↥ สำรองข้อมูลเป็นไฟล์</button><button class="listBtn" onclick="document.getElementById('restore').click()">↧ นำเข้าข้อมูลจากไฟล์</button><input id="restore" type="file" accept=".json" hidden onchange="restore(event)"></div>
 </div>
 
 <button class="fab" onclick="openModal()">＋</button><div class="toast" id="toast"></div>
@@ -52,16 +66,39 @@ header{display:flex;align-items:center;justify-content:space-between;margin:6px 
 const CATS=[['🍜','ค่ากิน'],['✨','สกินแคร์'],['🛍️','ของใช้'],['🚗','ค่ารถ'],['🏠','บ้าน'],['🎮','ความบันเทิง'],['✈️','ท่องเที่ยว'],['📦','อื่นๆ']];
 let expenses=JSON.parse(localStorage.getItem('expenses')||'[]');
 let cards=JSON.parse(localStorage.getItem('cards')||'["บัตรเครดิตหลัก"]');
-let pay='cash', editing=null, view=new Date();
+let pay='cash', editing=null, view=new Date(), rangeFrom='', rangeTo='';
 const baht=n=>'฿'+Number(n).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 function monthKey(){return view.getFullYear()+'-'+String(view.getMonth()+1).padStart(2,'0')}
 function monthText(){return view.toLocaleDateString('th-TH',{month:'long',year:'numeric'})}
 function init(){document.getElementById('category').innerHTML=CATS.map(c=>`<option value="${c[1]}">${c[0]} ${c[1]}</option>`).join('');render()}
-function render(){document.getElementById('month').textContent=monthText();let arr=expenses.filter(e=>e.date.startsWith(monthKey()));let total=arr.reduce((s,e)=>s+e.amount,0);document.getElementById('total').textContent=baht(total);document.getElementById('count').textContent=arr.length+' รายการ';['cash','bank'].forEach(p=>document.getElementById(p).textContent=baht(arr.filter(e=>e.pay===p).reduce((s,e)=>s+e.amount,0)));document.getElementById('cardTotal').textContent=baht(arr.filter(e=>e.pay==='card').reduce((s,e)=>s+e.amount,0));let max=Math.max(1,...CATS.map(c=>arr.filter(e=>e.category===c[1]).reduce((s,e)=>s+e.amount,0)));document.getElementById('cats').innerHTML=CATS.map(c=>{let v=arr.filter(e=>e.category===c[1]).reduce((s,e)=>s+e.amount,0);return `<div class="cat"><div class="catTop"><span>${c[0]}</span>${c[1]}</div><b>${baht(v)}</b><div class="bar"><i style="width:${Math.round(v/max*100)}%"></i></div></div>`}).join('');renderItems()}
-function renderItems(){let q=document.getElementById('search').value.toLowerCase().trim(),arr=expenses.filter(e=>e.date.startsWith(monthKey()));if(q)arr=arr.filter(e=>(e.note+' '+e.category+' '+e.card+' '+payText(e.pay)).toLowerCase().includes(q));arr.sort((a,b)=>b.id-a.id);document.getElementById('items').innerHTML=arr.length?arr.map(e=>`<div class="item" onclick="editExpense(${e.id})"><div class="ico">${e.emoji}</div><div class="info"><div class="note">${esc(e.note||e.category)}</div><div class="meta">${formatDate(e.date)} · ${payText(e.pay,e.card)} · ${e.category}</div></div><div class="price">${baht(e.amount)}</div></div>`).join(''):'<div class="empty">ยังไม่มีรายการ<br>กด ＋ เพื่อเพิ่มรายจ่าย</div>'}
+function activeExpenses(){
+ let arr=expenses.filter(e=>e.date.startsWith(monthKey()));
+ if(rangeFrom) arr=arr.filter(e=>e.date>=rangeFrom);
+ if(rangeTo) arr=arr.filter(e=>e.date<=rangeTo);
+ return arr;
+}
+function syncRangeInputs(){
+ const min=view.getFullYear()+'-'+String(view.getMonth()+1).padStart(2,'0')+'-01';
+ const last=new Date(view.getFullYear(),view.getMonth()+1,0);
+ const max=view.getFullYear()+'-'+String(view.getMonth()+1).padStart(2,'0')+'-'+String(last.getDate()).padStart(2,'0');
+ document.getElementById('fromDate').min=min; document.getElementById('fromDate').max=max;
+ document.getElementById('toDate').min=min; document.getElementById('toDate').max=max;
+ document.getElementById('fromDate').value=rangeFrom; document.getElementById('toDate').value=rangeTo;
+ document.getElementById('rangeLabel').textContent=(rangeFrom&&rangeTo)?('กำลังดู '+formatDate(rangeFrom)+' – '+formatDate(rangeTo)):(rangeFrom?('เริ่ม '+formatDate(rangeFrom)):(rangeTo?('ถึง '+formatDate(rangeTo)):'กำลังดูทั้งเดือน'));
+}
+function setRangeFromUI(){
+ rangeFrom=document.getElementById('fromDate').value; rangeTo=document.getElementById('toDate').value;
+ if(rangeFrom&&rangeTo&&rangeFrom>rangeTo){[rangeFrom,rangeTo]=[rangeTo,rangeFrom];}
+ render();
+}
+function resetRange(){rangeFrom='';rangeTo='';syncRangeInputs();render()}
+function render(){document.getElementById('month').textContent=monthText();syncRangeInputs();let arr=activeExpenses();let total=arr.reduce((s,e)=>s+e.amount,0);document.getElementById('total').textContent=baht(total);document.getElementById('count').textContent=arr.length+' รายการ';['cash','bank'].forEach(p=>document.getElementById(p).textContent=baht(arr.filter(e=>e.pay===p).reduce((s,e)=>s+e.amount,0)));document.getElementById('cardTotal').textContent=baht(arr.filter(e=>e.pay==='card').reduce((s,e)=>s+e.amount,0));let cardArr=arr.filter(e=>e.pay==='card'), cardSum=cardArr.reduce((s,e)=>s+e.amount,0);
+document.getElementById('cardRangeTotal').textContent=baht(cardSum);
+document.getElementById('cardBreakdown').innerHTML=cards.map(c=>{let v=cardArr.filter(e=>e.card===c).reduce((s,e)=>s+e.amount,0);return `<div class="cardrow"><div class="cardname">💳 ${esc(c)}</div><div class="cardamount">${baht(v)}</div></div>`}).join('') || '<div class="empty">ยังไม่มีบัตร</div>';let max=Math.max(1,...CATS.map(c=>arr.filter(e=>e.category===c[1]).reduce((s,e)=>s+e.amount,0)));document.getElementById('cats').innerHTML=CATS.map(c=>{let v=arr.filter(e=>e.category===c[1]).reduce((s,e)=>s+e.amount,0);return `<div class="cat"><div class="catTop"><span>${c[0]}</span>${c[1]}</div><b>${baht(v)}</b><div class="bar"><i style="width:${Math.round(v/max*100)}%"></i></div></div>`}).join('');renderItems()}
+function renderItems(){let q=document.getElementById('search').value.toLowerCase().trim(),arr=activeExpenses();if(q)arr=arr.filter(e=>(e.note+' '+e.category+' '+e.card+' '+payText(e.pay)).toLowerCase().includes(q));arr.sort((a,b)=>b.id-a.id);document.getElementById('items').innerHTML=arr.length?arr.map(e=>`<div class="item" onclick="editExpense(${e.id})"><div class="ico">${e.emoji}</div><div class="info"><div class="note">${esc(e.note||e.category)}</div><div class="meta">${formatDate(e.date)} · ${payText(e.pay,e.card)} · ${e.category}</div></div><div class="price">${baht(e.amount)}</div></div>`).join(''):'<div class="empty">ยังไม่มีรายการ<br>กด ＋ เพื่อเพิ่มรายจ่าย</div>'}
 function payText(p,c){return p==='cash'?'เงินสด':p==='bank'?'โอนจากธนาคาร':'บัตร '+c}
 function formatDate(s){return new Date(s+'T12:00:00').toLocaleDateString('th-TH',{day:'numeric',month:'short'})}
-function changeMonth(n){view=new Date(view.getFullYear(),view.getMonth()+n,1);document.getElementById('search').value='';render()}
+function changeMonth(n){view=new Date(view.getFullYear(),view.getMonth()+n,1);rangeFrom='';rangeTo='';document.getElementById('search').value='';render()}
 function clearSearch(){document.getElementById('search').value='';renderItems()}
 function selectPay(el){document.querySelectorAll('.pay').forEach(x=>x.classList.remove('sel'));el.classList.add('sel');pay=el.dataset.pay;document.getElementById('cardField').style.display=pay==='card'?'block':'none'}
 function fillCards(){document.getElementById('card').innerHTML=cards.map(c=>`<option>${esc(c)}</option>`).join('')}
