@@ -1,1 +1,1 @@
-My Expenses V4 - friend expenses / receivables
+My Expenses V5: ระบบเพื่อนค้างเรา/เราติดเพื่อน, ดูรายบิลรายคน, เพิ่มเพื่อน, backup/restore

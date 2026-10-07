@@ -20,7 +20,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin:6px 
 
 .cardrow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
 .cardrow:last-child{border-bottom:0}.cardname{display:flex;align-items:center;gap:8px;font-weight:650}.cardamount{font-weight:800}
-.friendrow{display:grid;grid-template-columns:1fr 105px 38px;gap:7px;margin-bottom:8px}.removeFriend{border:0;background:#fff0f2;color:#c84d68;border-radius:12px;font-size:18px}''</style>
+.friendrow{display:grid;grid-template-columns:1fr 105px 38px;gap:7px;margin-bottom:8px}.removeFriend{border:0;background:#fff0f2;color:#c84d68;border-radius:12px;font-size:18px}''.friendrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}.friendrow:last-child{border-bottom:0}</style>
 </head>
 <body>
 <div class="app">
@@ -45,6 +45,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin:6px 
 
 <div class="card"><div class="cardhead"><div class="ctitle">รายการ</div><button class="link" onclick="clearSearch()">ล้างค้นหา</button></div><input class="search" id="search" placeholder="🔎 ค้นหา เช่น ชาบู / เซรั่ม / KBank" oninput="renderItems()"><div id="items"></div></div>
 
+<div class="card"><div class="cardhead"><div class="ctitle">เงินกับเพื่อน</div><button class="link" onclick="addFriend()">＋ เพิ่มเพื่อน</button></div><div id="friendBalances"></div></div>
 <div class="card"><div class="cardhead"><div class="ctitle">ข้อมูล</div></div><div class="small">เลือกช่วงวันที่ได้ เช่น 1–15 หรือ 16–สิ้นเดือน และดูยอดบัตรแต่ละใบแยกกันได้ ข้อมูลเก็บในเครื่องนี้เป็นหลัก แนะนำให้สำรองข้อมูลเป็นระยะ</div><button class="listBtn" onclick="backup()">↥ สำรองข้อมูลเป็นไฟล์</button><button class="listBtn" onclick="document.getElementById('restore').click()">↧ นำเข้าข้อมูลจากไฟล์</button><input id="restore" type="file" accept=".json" hidden onchange="restore(event)"></div>
 </div>
 
@@ -54,7 +55,12 @@ header{display:flex;align-items:center;justify-content:space-between;margin:6px 
 <h2 id="modalTitle">เพิ่มรายจ่าย</h2>
 <div class="field"><label>จำนวนเงิน (บาท)</label><input class="input" id="amount" type="number" inputmode="decimal" placeholder="0.00" oninput="checkFriendTotal()"></div>
 <div class="field"><label>วันที่</label><input class="input" id="date" type="date"></div>
+<div class="field"><label>ประเภท</label><div class="paygrid">
+<button class="pay sel" id="modeMine" data-mode="mine" onclick="selectMode(this)">💸<br>ฉันจ่าย</button>
+<button class="pay" id="modeOwe" data-mode="owe" onclick="selectMode(this)">🤝<br>ติดเพื่อน</button>
+</div></div>
 <div class="field"><label>จ่ายด้วย</label><div class="paygrid"><button class="pay sel" data-pay="cash" onclick="selectPay(this)">💵<br>เงินสด</button><button class="pay" data-pay="card" onclick="selectPay(this)">💳<br>บัตรเครดิต</button><button class="pay" data-pay="bank" onclick="selectPay(this)">🏦<br>โอน</button></div></div>
+<div class="field" id="oweFriendField" style="display:none"><label>ติดเพื่อนคนไหน</label><select class="select" id="oweFriend"></select></div>
 <div class="field" id="cardField" style="display:none"><label>บัตรเครดิต</label><select class="select" id="card"></select></div>
 <div class="field"><label>หมวดหมู่</label><select class="select" id="category"></select></div>
 <div class="field"><label>โน้ต</label><input class="input" id="note" placeholder="เช่น กินชาบู / ซื้อเซรั่ม"></div>
@@ -94,7 +100,32 @@ function setRangeFromUI(){
  render();
 }
 function resetRange(){rangeFrom='';rangeTo='';syncRangeInputs();render()}
-function render(){document.getElementById('month').textContent=monthText();syncRangeInputs();let arr=activeExpenses();let total=arr.reduce((s,e)=>s+e.amount,0);document.getElementById('total').textContent=baht(total);document.getElementById('count').textContent=arr.length+' รายการ';['cash','bank'].forEach(p=>document.getElementById(p).textContent=baht(arr.filter(e=>e.pay===p).reduce((s,e)=>s+e.amount,0)));document.getElementById('cardTotal').textContent=baht(arr.filter(e=>e.pay==='card').reduce((s,e)=>s+e.amount,0));let cardArr=arr.filter(e=>e.pay==='card'), cardSum=cardArr.reduce((s,e)=>s+e.amount,0);
+
+function populateFriends(){document.getElementById('oweFriend').innerHTML=friends.map(f=>`<option>${esc(f)}</option>`).join('')}
+function selectMode(el){
+ document.querySelectorAll('#modeMine,#modeOwe').forEach(x=>x.classList.remove('sel')); el.classList.add('sel');
+ expenseMode=el.dataset.mode;
+ document.getElementById('oweFriendField').style.display=expenseMode==='owe'?'block':'none';
+ document.querySelectorAll('.pay').forEach(x=>{if(x.dataset.pay)x.style.display=expenseMode==='owe'?'none':''});
+}
+function renderFriends(){
+ const box=document.getElementById('friendBalances');
+ box.innerHTML=friends.map(f=>{
+  const open=friendDebts.filter(d=>d.friend===f&&d.status!=='paid').reduce((s,d)=>s+d.amount,0);
+  return `<div class="friendrow" onclick="friendDetails('${esc(f)}')"><div><b>${esc(f)}</b><div class="small">ค้างเรา</div></div><b>${baht(open)}</b></div>`;
+ }).join('');
+}
+function friendDetails(name){
+ const arr=friendDebts.filter(d=>d.friend===name);
+ if(!arr.length){alert(name+' ยังไม่มีรายการ');return}
+ const lines=arr.map(d=>`${d.status==='paid'?'✓':'•'} ${d.note||'รายการ'} — ${d.type==='owe'?'เราติดเพื่อน':'เพื่อนค้างเรา'} ${baht(d.amount)}`);
+ const open=arr.filter(d=>d.status!=='paid');
+ let msg='รายการของ '+name+'\\n\\n'+lines.join('\\n');
+ if(open.length && confirm(msg+'\\n\\nกด OK หากต้องการทำเครื่องหมายรายการค้างทั้งหมดเป็น “ชำระแล้ว”')){open.forEach(d=>d.status='paid');persist();render();toast('อัปเดตสถานะแล้ว')}
+ else if(!open.length) alert(msg);
+}
+function addFriend(){let n=prompt('ชื่อเพื่อนใหม่');if(n&&n.trim()&&!friends.includes(n.trim())){friends.push(n.trim());persist();populateFriends();renderFriends();toast('เพิ่มเพื่อนแล้ว')}}
+function render(){document.getElementById('month').textContent=monthText();syncRangeInputs();renderFriends();let arr=activeExpenses();let total=arr.reduce((s,e)=>s+e.amount,0);document.getElementById('total').textContent=baht(total);document.getElementById('count').textContent=arr.length+' รายการ';['cash','bank'].forEach(p=>document.getElementById(p).textContent=baht(arr.filter(e=>e.pay===p).reduce((s,e)=>s+e.amount,0)));document.getElementById('cardTotal').textContent=baht(arr.filter(e=>e.pay==='card').reduce((s,e)=>s+e.amount,0));let cardArr=arr.filter(e=>e.pay==='card'), cardSum=cardArr.reduce((s,e)=>s+e.amount,0);
 document.getElementById('cardRangeTotal').textContent=baht(cardSum);
 document.getElementById('cardBreakdown').innerHTML=cards.map(c=>{let v=cardArr.filter(e=>e.card===c).reduce((s,e)=>s+e.amount,0);return `<div class="cardrow"><div class="cardname">💳 ${esc(c)}</div><div class="cardamount">${baht(v)}</div></div>`}).join('') || '<div class="empty">ยังไม่มีบัตร</div>';let unpaid={};arr.forEach(e=>(e.friends||[]).forEach((f,i)=>{if(!f.settled)unpaid[f.name]=(unpaid[f.name]||0)+Number(f.amount)}));let friendSum=Object.values(unpaid).reduce((s,v)=>s+v,0);document.getElementById('friendTotal').textContent=baht(friendSum);let fh='';Object.entries(unpaid).forEach(([n,v])=>{fh+=`<div class="cardrow"><div class="cardname">👤 ${esc(n)}</div><div class="cardamount">${baht(v)}</div></div>`});document.getElementById('friendBreakdown').innerHTML=fh||'<div class="empty">ไม่มีเงินที่เพื่อนค้าง</div>';let max=Math.max(1,...CATS.map(c=>arr.filter(e=>e.category===c[1]).reduce((s,e)=>s+e.amount,0)));document.getElementById('cats').innerHTML=CATS.map(c=>{let v=arr.filter(e=>e.category===c[1]).reduce((s,e)=>s+e.amount,0);return `<div class="cat"><div class="catTop"><span>${c[0]}</span>${c[1]}</div><b>${baht(v)}</b><div class="bar"><i style="width:${Math.round(v/max*100)}%"></i></div></div>`}).join('');renderItems()}
 function renderItems(){let q=document.getElementById('search').value.toLowerCase().trim(),arr=activeExpenses();if(q)arr=arr.filter(e=>(e.note+' '+e.category+' '+e.card+' '+payText(e.pay)).toLowerCase().includes(q));arr.sort((a,b)=>b.id-a.id);document.getElementById('items').innerHTML=arr.length?arr.map(e=>`<div class="item" onclick="editExpense(${e.id})"><div class="ico">${e.emoji}</div><div class="info"><div class="note">${esc(e.note||e.category)}</div><div class="meta">${formatDate(e.date)} · ${payText(e.pay,e.card)} · ${e.category}</div></div><div class="price">${baht(e.amount)}</div></div>`).join(''):'<div class="empty">ยังไม่มีรายการ<br>กด ＋ เพื่อเพิ่มรายจ่าย</div>'}
@@ -106,7 +137,19 @@ function selectPay(el){document.querySelectorAll('.pay').forEach(x=>x.classList.
 function fillCards(){document.getElementById('card').innerHTML=cards.map(c=>`<option>${esc(c)}</option>`).join('')}
 function openModal(id=null){editing=id;document.getElementById('modal').style.display='flex';fillCards();document.getElementById('deleteBtn').style.display=id?'block':'none';if(id){let e=expenses.find(x=>x.id===id);document.getElementById('modalTitle').textContent='แก้ไขรายจ่าย';document.getElementById('amount').value=e.amount;document.getElementById('date').value=e.date;document.getElementById('category').value=e.category;document.getElementById('note').value=e.note;pay=e.pay;friendRows=(e.friends||[]).map(f=>({...f}));document.getElementById('hasFriends').checked=friendRows.length>0;toggleFriends();renderFriendRows();document.querySelectorAll('.pay').forEach(x=>x.classList.toggle('sel',x.dataset.pay===pay));document.getElementById('cardField').style.display=pay==='card'?'block':'none';document.getElementById('card').value=e.card}else{document.getElementById('modalTitle').textContent='เพิ่มรายจ่าย';document.getElementById('amount').value='';document.getElementById('date').value=new Date().toISOString().slice(0,10);document.getElementById('note').value='';pay='cash';friendRows=[];document.getElementById('hasFriends').checked=false;toggleFriends();renderFriendRows();document.querySelectorAll('.pay').forEach(x=>x.classList.toggle('sel',x.dataset.pay==='cash'));document.getElementById('cardField').style.display='none'}}
 function closeModal(){document.getElementById('modal').style.display='none';editing=null}
-function saveExpense(){let amount=Number(document.getElementById('amount').value);if(!amount){toast('กรุณาใส่จำนวนเงิน');return}let c=CATS.find(x=>x[1]===document.getElementById('category').value);let friends=document.getElementById('hasFriends').checked?friendRows.filter(f=>f.name&&Number(f.amount)>0).map(f=>({name:f.name,amount:Number(f.amount),settled:!!f.settled})):[];let friendSum=friends.reduce((s,f)=>s+f.amount,0);if(friendSum>amount){toast('ยอดเพื่อนมากกว่ายอดบิล');return}let obj={id:editing||Date.now(),amount,date:document.getElementById('date').value,pay,card:pay==='card'?document.getElementById('card').value:'',category:c[1],emoji:c[0],note:document.getElementById('note').value.trim(),friends};if(editing){let i=expenses.findIndex(x=>x.id===editing);expenses[i]=obj}else expenses.unshift(obj);persist();closeModal();render();toast(editing?'แก้ไขรายการแล้ว':'บันทึกรายการแล้ว')}
+function saveExpense(){
+ let amount=Number(document.getElementById('amount').value); if(!amount){toast('กรุณาใส่จำนวนเงิน');return}
+ let c=CATS.find(x=>x[1]===document.getElementById('category').value);
+ let obj={id:editing||Date.now(),amount,date:document.getElementById('date').value,
+ pay:expenseMode==='owe'?'none':pay,card:expenseMode==='owe'?'':(pay==='card'?document.getElementById('card').value:''),
+ category:c[1],emoji:c[0],note:document.getElementById('note').value.trim()};
+ if(editing){let i=expenses.findIndex(x=>x.id===editing);expenses[i]=obj}
+ else{
+  expenses.unshift(obj);
+  if(expenseMode==='owe') friendDebts.push({id:Date.now()+1,friend:document.getElementById('oweFriend').value,amount,date:obj.date,note:obj.note||obj.category,type:'owe',status:'open',expenseId:obj.id});
+ }
+ persist();closeModal();render();toast(editing?'แก้ไขรายการแล้ว':'บันทึกรายการแล้ว');
+}
 function editExpense(id){openModal(id)}
 function toggleFriends(){document.getElementById('friendsField').style.display=document.getElementById('hasFriends').checked?'block':'none';if(document.getElementById('hasFriends').checked&&friendRows.length===0)addFriendRow();renderFriendRows()}
 function addFriendRow(){friendRows.push({name:friendNames[0]||'',amount:0,settled:false});renderFriendRows()}
@@ -117,9 +160,9 @@ function manageFriends(){let n=prompt('เพิ่มชื่อเพื่�
 function settleFriend(expenseId,idx){let e=expenses.find(x=>x.id===expenseId);if(e&&e.friends&&e.friends[idx]){e.friends[idx].settled=!e.friends[idx].settled;persist();render()}}
 function deleteExpense(){if(!editing)return;if(confirm('ลบรายการนี้ใช่ไหม?')){expenses=expenses.filter(e=>e.id!==editing);persist();closeModal();render();toast('ลบรายการแล้ว')}}
 function manageCards(){let name=prompt('ชื่อบัตรใหม่ เช่น KBank Visa');if(name&&name.trim()){cards.push(name.trim());persist();toast('เพิ่มบัตร '+name.trim()+' แล้ว')}}
-function persist(){localStorage.setItem('expenses',JSON.stringify(expenses));localStorage.setItem('cards',JSON.stringify(cards))}
+function persist(){localStorage.setItem('expenses',JSON.stringify(expenses));localStorage.setItem('cards',JSON.stringify(cards));localStorage.setItem('friends',JSON.stringify(friends));localStorage.setItem('friendDebts',JSON.stringify(friendDebts))}
 function backup(){let data={version:4,exportedAt:new Date().toISOString(),expenses,cards,friendNames};let blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='my-expenses-backup-'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(a.href);toast('สำรองข้อมูลแล้ว')}
-function restore(ev){let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!Array.isArray(d.expenses)||!Array.isArray(d.cards))throw 0;expenses=d.expenses;cards=d.cards;friendNames=d.friendNames||friendNames;localStorage.setItem('friendNames',JSON.stringify(friendNames));persist();render();toast('นำเข้าข้อมูลแล้ว')}catch(e){alert('ไฟล์สำรองไม่ถูกต้อง')}};r.readAsText(f);ev.target.value=''}
+function restore(ev){let f=ev.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(!Array.isArray(d.expenses)||!Array.isArray(d.cards))throw 0;expenses=d.expenses;cards=d.cards;friends=Array.isArray(d.friends)?d.friends:friends;friendDebts=Array.isArray(d.friendDebts)?d.friendDebts:friendDebts;friendNames=d.friendNames||friendNames;localStorage.setItem('friendNames',JSON.stringify(friendNames));persist();render();toast('นำเข้าข้อมูลแล้ว')}catch(e){alert('ไฟล์สำรองไม่ถูกต้อง')}};r.readAsText(f);ev.target.value=''}
 function toast(t){let x=document.getElementById('toast');x.textContent=t;x.style.display='block';setTimeout(()=>x.style.display='none',1800)}
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
 init();
