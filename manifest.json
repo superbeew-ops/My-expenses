@@ -1,9 +1,1 @@
-{
-  "name": "My Expenses",
-  "short_name": "Expenses",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#fffaf7",
-  "theme_color": "#fffaf7",
-  "lang": "th"
-}
+{"name":"My Expenses","short_name":"Expenses","start_url":"./","display":"standalone","background_color":"#fffaf7","theme_color":"#fffaf7","lang":"th"}
